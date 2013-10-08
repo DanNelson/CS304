@@ -1,0 +1,496 @@
+// FILE: bag2.template
+// CLASS implemented: bag (see bag2.h for documentation)
+// DATE: 10/04/13
+// INVARIANT for the bag class:
+//   1. The number of items in the bag is in the member variable used, 
+//		the array in_use is used to determine if the current position is
+//      in use and a receipt is given which coincides with the array position; 
+//   2. The actual items in the bag are stored in a partially filled array.
+//      The array is a dynamic array, pointed to by the member variable data;
+//   3. The size of the dynamic array is in the member variable capacity.
+// File modified by: Danny Nelson 10/7/13
+
+#include "stdafx.h"
+#include "bag.h"
+
+using namespace std;
+
+namespace cs304_bag
+{
+   //Constructor to create a new bag object
+	template <class Item>
+    bag<Item>::bag(size_type initial_capacity)
+    {
+		//Create new array for items
+        data = new Item[initial_capacity];
+		//Create new array to determine if the current position is in use
+		in_use = new bool[initial_capacity];
+		//Set all of the positions in the in_use array to zero
+		for(bag::size_type i = 0; i < initial_capacity; i++){
+			in_use[i] = false;
+		}
+		//The capacity of the bag will be set to the initial_capacity parameter of the constructor
+        capacity = initial_capacity;
+		//The used and largest receipt are set to zero seeing nothing is in the bag
+        used = 0;
+		largest_receipt = 0;
+    }
+
+	//Constructor called by compiler
+    template <class Item>
+    bag<Item>::bag(const bag<Item>& source)
+    // Library facilities used: algorithm
+    {
+		//Creates new instance variables and copies the data from the old bag to the
+		//New bag
+        data = new Item[source.capacity];
+		in_use = new bool[source.capacity];
+        capacity = source.capacity;
+        used = source.used;
+		largest_receipt = source.largest_receipt;
+        copy(source.data, source.data + capacity, data);
+		copy(source.in_use, source.in_use + capacity, in_use);
+    }
+
+	//Destructor called when the program completes to release memory
+    template <class Item>
+    bag<Item>::~bag( )
+    {
+		//Deletes dynamically allocated arrays
+		delete [ ] data;
+		delete [ ] in_use;
+    }
+
+	//Changes the size of the bag
+   template <class Item>
+   void bag<Item>::reserve(size_type new_capacity)
+    // Library facilities used: algorithm
+    {
+		//Create pointers to new arrays
+        Item *larger_array;
+		bool * larger_array_bool;
+
+		// The allocated memory is already the right size, do not change the size of the bag
+        if (new_capacity == capacity){
+            return; 
+		}
+
+		//Can’t allocate less than we are using
+        if (new_capacity < (largest_receipt+1)){
+            new_capacity = largest_receipt+1; 
+		}
+
+		//Create a larger array of value_types then copy the data from the old array
+		//To the new array and delete the old array
+        larger_array = new Item[new_capacity];
+        std::copy(data, data + largest_receipt+1, larger_array);
+        delete [ ] data;
+        data = larger_array;
+		
+		//Create the new larger array of booleans then copy the data from the old array
+		//To the new array and delete the old array
+		larger_array_bool = new bool[new_capacity];
+        std::copy(in_use, in_use + largest_receipt +1, larger_array_bool);
+        delete [ ] in_use;
+        in_use = larger_array_bool;
+
+		//Set all the newly create positions to false
+		for(size_type iterator = largest_receipt+1; iterator < new_capacity;iterator++){
+			in_use[iterator] = false;
+		}
+        
+		//Set the capacity to the new larger size
+		capacity = new_capacity;
+		       
+    }
+    
+	//Inserts items into the bag
+    template <class Item>
+    typename bag<Item>::size_type bag<Item>::insert(const Item& entry)
+    {   
+		//Create a size_type for the iterator
+		bag::size_type i = 0;
+		
+		//If more memory needs to be allocated, call the reserve function 
+        if ((largest_receipt+1) == capacity)
+			reserve(capacity+1);
+		
+		//Loop to find a free position
+		for(i = 0; i < capacity; i++){
+			//If a free position is found
+			if(in_use[i] == false){
+				//Put the item in the bag
+				data[i] = entry;
+				//Indicate that the position is used
+				in_use[i] = true;
+				//Increment the number of items in the bag
+				used++;
+				//If it is the last position in the array
+				if(i == (largest_receipt+1))
+					largest_receipt = i;
+				//Return the receipt number
+				return i;
+			}
+		}
+		//Should never get here keeps the compiler happy
+		return i;
+    }
+
+	//Removes an item from the bag
+	template <class Item>
+	Item bag<Item>::remove(size_type receipt_number){
+		//If the receipt the user entered is larger than the highest
+		//Spot filled in the bag there is no item to return
+		if(receipt_number > largest_receipt)
+			throw std::out_of_range("The receipt number is larger than the highest receipt number!");
+
+		//If there is no item in the position that the user entered
+		//There is no item to return
+		if(!in_use[receipt_number])
+			throw std::out_of_range("The receipt number is currently not in use!");
+
+		//Decrement the number of items in the bag
+		used --;
+		//Set the position to unused
+		in_use[receipt_number] = false;
+		//Return the item the user requested
+		return data[receipt_number];
+	}
+
+	//Assignment operator
+	template <class Item>
+    void bag<Item>::operator =(const bag<Item>& source)
+    // Library facilities used: algorithm
+    {
+
+	// Check for possible self-assignment:
+	if (this == &source)
+            return;
+
+	// If needed, allocate an array with a different size:
+	if (capacity != source.capacity)
+	{
+		//Use the reserve function instead of rewriting it
+		reserve(source.capacity);
+	}
+
+	// Copy the data from the source object
+	used = source.used;
+	largest_receipt = source.largest_receipt;
+	copy(source.data, source.data + capacity, data);
+	copy(source.in_use, source.in_use + capacity, in_use);
+    
+	}
+
+	//Counts the number of times a particular value appears in the bag
+    template <class Item>
+    typename bag<Item>::size_type bag<Item>::count(const Item& target) const
+    {
+	//Creates instance variables for iterator and number of times the value appears
+	size_type answer;
+	size_type i;
+	answer = 0;
+	
+	//Loop to look through the array to determine how many times the value appears in the bag
+	for (i = 0; i < largest_receipt; ++i){
+		//Check to see if the item is in the bag
+		//Also make sure the position in the bag is in_use because when an item is removed the position it
+		//Is not uninitialized. Uses short-circuit evaluation
+		if ((in_use[i]) && (target == data[i]))
+			++answer;
+	}
+	return answer;
+    }
+
+	//Non-Const overloading of the [] operator
+	template <class Item>
+    Item bag<Item>::operator [](size_type receipt_number){
+		//If the receipt number the user entered was greater than the largest receipt number
+		if(receipt_number > largest_receipt)
+			throw std::out_of_range("The receipt number is larger than the highest receipt number!");
+
+		//If the position in the bag is not in use
+		if(!in_use[receipt_number])
+			throw std::out_of_range("The receipt number is currently not in use!");
+
+		return data[receipt_number];
+	}
+
+	//Const overloading of the [] operator
+	 template <class Item>
+    Item const * bag<Item>::operator [](size_type receipt_number) const{
+		 //If the receipt number the user entered was greater than the largest receipt number
+		if(receipt_number > largest_receipt)
+			throw std::out_of_range("The receipt number is larger than the highest receipt number! Thrown from const.");
+		
+		//If the position in the bag is not in use
+		if(!in_use[receipt_number])
+			throw std::out_of_range("The receipt number is currently not in use! Thrown from const.");
+		return &data[receipt_number];
+	}
+
+	//Constructor for the non-const bag iterator
+	template <class Item>
+  	bag_iterator<Item>::bag_iterator(Item * initial_data = NULL, bool * initial_in_use = NULL, typename bag<Item>::size_type * initial_capacity = NULL){
+		//Set the iterator instance variables to the parameters of the constructor and initialize the state
+		data = initial_data;
+		in_use = initial_in_use;
+		capacity = initial_capacity;
+		state = 0;
+		//If the data in the parameters of the constructor is not null
+		if(initial_data != NULL){
+		typename bag<Item>::size_type i;
+		//Find the first position that contains an item in it encase the first position in the bag is empty
+			for (i = 0; i < *capacity; ++i){
+				if(in_use[i]){
+					state = i;
+					break;
+				}
+			}
+		}
+	}
+
+	//Function to begin the bag iterator
+	template <class Item>
+	bag_iterator<Item> bag<Item>::begin(){
+		//Put the parameters from the bag into the iterator
+		iterator returnI(data,in_use,&capacity);
+		return returnI;
+	}
+	
+	//Function to find the end of the iterator
+	template <class Item>
+	bag_iterator<Item> bag<Item>::end(){
+		//Create an iterator with the default parameters which will be a null iterator
+		return iterator ();
+	}
+
+	//Function to override the prefix ++ operator
+	template <class Item>
+	 bag_iterator<Item>& bag_iterator<Item>::operator ++(){
+		 typename bag<Item>::size_type i;
+		//Iterate over the bag to find the next in_use position
+		for (i = state + 1; i < *capacity; ++i){
+			//If a position is found set the state to that position and return the iterator
+			if(in_use[i]){
+				state = i;
+				return *this;
+			}
+		}
+		//Only executed if there is no more items in the bag which would then set all
+		//Variables to null and equal the end
+		data = NULL;
+		in_use = NULL;
+		capacity = NULL;
+		state = 0;
+		//Return the null iterator which will match end
+		return *this;
+	}
+	 //Function to override the prefix -- operator
+	template <class Item>
+	bag_iterator<Item>& bag_iterator<Item>::operator --(){
+		typename bag<Item>::size_type i;
+		//If you are at the first position in an array, do not go to the -1 position
+		if(state != 0){
+			//Find out where the next in_use item is
+			for (i = state - 1; i >= 0; --i){
+				//If there is a next item in the bag set the state to that item
+				if(in_use[i]){
+					state = i;
+					return *this;
+				}
+			}
+		}
+		//If there are no items to be decremented through
+		data = NULL;
+		in_use = NULL;
+		capacity = NULL;
+		state = 0;
+		//Return the null iterator which will match end
+		return *this;
+	}
+	//Function to override the postfix ++ operator
+	template <class Item>
+	bag_iterator<Item> bag_iterator<Item>::operator ++(int){
+		//Set a bag iterator equal to the iterator the function is being called on
+		//This will allow the original iterator to be incremented, but return the original iterator without incrementing it
+		bag_iterator it = *this;
+		//Increment the iterator this is being called on 
+		++(*this);
+		//Return the iterator that was passed in without being incremented
+		return it;
+	}
+
+	//Function to override the postfix -- operator
+	template <class Item>
+	bag_iterator<Item> bag_iterator<Item>::operator --(int){
+		//Set a bag iterator equal to the iterator the function is being called on
+		//This will allow the original iterator to be decremented, but return the original iterator without decrementing it
+		bag_iterator it = *this;
+		//Decrement the iterator this is being called on 
+		--(*this);
+		//Return the iterator that was passed in without being decremented
+		return it;
+
+	}
+
+	//Function to allow the iterator to be dereferenced 
+	template <class Item>
+	Item bag_iterator<Item>::operator * ( ) const{
+		if(data == NULL)
+			return NULL;
+		return data[state];
+	}
+
+	//Function to override the == operator
+	template <class Item>
+	bool bag_iterator<Item>::operator == (const bag_iterator i) const{
+		if((data == i.data) && (state == i.state)){
+			return true;
+		}
+		return false;
+	}
+
+	//Function to override the != operator
+	template <class Item>
+	bool bag_iterator<Item>::operator != (const bag_iterator i) const{
+		if((data == i.data) && (state == i.state)){
+			return false;
+		}
+		return true;
+	}
+
+	//Constructor for the constant iterator class
+	template <class Item>
+  	const_bag_iterator<Item>::const_bag_iterator( const Item * initial_data = NULL,const bool * initial_in_use = NULL, typename const bag<Item>::size_type * initial_capacity = NULL){
+		//Set the const iterator instance variables to the parameters of the constructor and initialize the state
+		data = initial_data;
+		in_use = initial_in_use;
+		capacity = initial_capacity;
+		state = 0;
+		//If the data in the parameters of the constructor is not null
+		if(initial_data != NULL){
+		typename bag<Item>::size_type i;
+		//Find the first position that contains an item in it encase the first position in the bag is empty
+			for (i = 0; i < *capacity; ++i){
+				if(in_use[i]){
+					state = i;
+					break;
+				}
+			}
+		}
+	}
+
+	//Function to begin the bag iterator
+	template <class Item>
+	const_bag_iterator<Item> bag<Item>::begin() const{
+		//Place the parameters from the bag into the bag iterator
+		const_iterator returnI(data,in_use,&capacity);
+		return returnI;
+	}
+	
+	//Function to find the end of the iterator
+	template <class Item>
+	const_bag_iterator<Item> bag<Item>::end() const{
+		//Create an iterator with the default parameters which will be a null iterator
+		return const_iterator ();
+	}
+
+	//Function to override the prefix ++ operator
+	template <class Item>
+	const_bag_iterator<Item>& const_bag_iterator<Item>::operator ++(){
+		typename bag<Item>::size_type i;
+		//Iterate over the bag to find the next in_use position
+		for (i = state + 1; i < *capacity; ++i){
+			//If a position is found set the state to that position and return the iterator
+			if(in_use[i]){
+				state = i;
+				return *this;
+			}
+		}
+		//Only executed if there is no more items in the bag which would then set all
+		//Variables to null and equal the end
+		data = NULL;
+		in_use = NULL;
+		capacity = NULL;
+		state = 0;
+		//Return the null iterator which will match end
+		return *this;
+	}
+
+	//Function to override the prefix -- operator
+	template <class Item>
+	const_bag_iterator<Item>& const_bag_iterator<Item>::operator --(){
+		typename bag<Item>::size_type i;
+		//If you are at the first position in an array, do not go to the -1 position
+		if(state != 0){
+			//Find out where the next in_use item is
+			for (i = state - 1; i >= 0; --i){
+				//If there is a next item in the bag set the state to that item
+				if(in_use[i]){
+					state = i;
+					return *this;
+				}
+			}
+		}
+		//If there are no items to be decremented through
+		data = NULL;
+		in_use = NULL;
+		capacity = NULL;
+		state = 0;
+		//Return the null iterator which will match end
+		return *this;
+	}
+
+	//Function to override the postfix ++ operator
+	template <class Item>
+	const_bag_iterator<Item> const_bag_iterator<Item>::operator ++(int){
+		//Set a bag iterator equal to the iterator the function is being called on
+		//This will allow the original iterator to be incremented, but return the original iterator without incrementing it
+		const_bag_iterator it = *this;
+		//Increment the iterator this is being called on 
+		++(*this);
+		//Return the iterator that was passed in without being incremented
+		return it;
+	}
+
+	//Function to override the postfix -- operator
+	template <class Item>
+	const_bag_iterator<Item> const_bag_iterator<Item>::operator --(int){
+		//Set a bag iterator equal to the iterator the function is being called on
+		//This will allow the original iterator to be decremented, but return the original iterator without decrementing it
+		const_bag_iterator it = *this;
+		//Decrement the iterator this is being called on 
+		--(*this);
+		//Return the iterator that was passed in without being decremented
+		return it;
+
+	}
+
+	//Function to allow the iterator to be dereferenced 
+	template <class Item>
+	Item const_bag_iterator<Item>::operator * ( ) const{
+		if(data == NULL)
+			return NULL;
+		return data[state];
+	}
+
+	//Function to override the == operator
+	template <class Item>
+	bool const_bag_iterator<Item>::operator == (const const_bag_iterator i) const{
+		if((data == i.data) && (state == i.state)){
+			return true;
+		}
+		return false;
+	}
+
+	//Function to override the != operator
+	template <class Item>
+	bool const_bag_iterator<Item>::operator != (const const_bag_iterator i) const{
+		if((data == i.data) && (state == i.state)){
+			return false;
+		}
+		return true;
+	}
+
+}
